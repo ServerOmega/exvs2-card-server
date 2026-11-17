@@ -21,6 +21,8 @@ Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Proposed stack, packaging, config, admin API, CLI, and services |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones M0–M7, parity tests, risks, and launcher downloads |
 | [docs/MIGRATION.md](docs/MIGRATION.md) | Moving player data from an existing card server without losing stats |
+| [docs/spec/CUSTOM-MATCH-ROOMS.md](docs/spec/CUSTOM-MATCH-ROOMS.md) | Draft behaviour spec for Custom Match rooms (LM LoadRoom / RegisterRoom, the cab's room tag, shared rooms across card servers) |
+| [docs/FINDINGS-2026-11-17.md](docs/FINDINGS-2026-11-17.md) | 17 Nov 2026 findings: cross-server rooms working on real cabinets, Dual Select vs One rules, networking errors (21-01 / 21-11 / 21-32), the LM's 16-seat limit, LM resource use, the stand-in LM direction, problems and fixes |
 | [docs/MATCHMAKING-SERVERS.md](docs/MATCHMAKING-SERVERS.md) | Switching any matchmaking server (including third-party ones) without touching card data or resetting the operator's leaderboard |
 
 People should keep using their current card server until this one can replace it. Each milestone has to pass against real cabinets before the next one starts in earnest. A 1.0 release cannot ship until migrated player stats have been verified against the previous server.
