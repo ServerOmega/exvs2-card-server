@@ -11,7 +11,7 @@ This is a proposed architecture for the clean-room card server. It is not an imp
 - There is no web interface. Public community stats stay on the existing global leaderboards, not on this process.
 - Protocol behavior comes from the clean-room spec in [CLEAN-ROOM.md](CLEAN-ROOM.md).
 - Secrets and player identifiers stay out of logs, sample config, and the git history.
-- Moving to this server, or switching matchmaking regions, must not interfere with player stats. See [MIGRATION.md](MIGRATION.md) and [REGIONS.md](REGIONS.md).
+- Moving to this server, or switching any matchmaking server (including a third-party one), must not interfere with player stats. See [MIGRATION.md](MIGRATION.md) and [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
 
 ## Runtime and HTTP stack
 
@@ -42,8 +42,8 @@ The repository will eventually hold GitHub Actions that build those two required
 - **SQLite** as the default database, stored in a configured data directory.
 - Access via **EF Core or Dapper** (decided at M2). Schema migrations are versioned in this repository and applied on startup, or by an explicit command, so an older data directory can move forward safely.
 - The schema is designed here, from the behavior spec. It is not imported from any other server's source.
-- Card identity fields the cabinet uses to recognize a card (referred to here as ChipId and AccessCode) are stored so that a migrated or region-switched card keeps the same identity. Those values are secrets: they are never logged, never used as example data, and never committed.
-- Match history rows keep a region field, as described in [REGIONS.md](REGIONS.md). Player stats themselves are not partitioned by region.
+- Card identity fields the cabinet uses to recognize a card (referred to here as ChipId and AccessCode) are stored so that a migrated card, or a card whose cabinet has switched matchmaking servers, keeps the same identity. Those values are secrets: they are never logged, never used as example data, and never committed.
+- Match history rows record which matchmaking server (label or host) was in use, as described in [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md). Player stats themselves are not partitioned by matchmaker.
 
 Do not commit live database files. Tests use throwaway files or in-memory equivalents, with fake identifiers only.
 
@@ -55,7 +55,7 @@ A single config file next to the executable, or at a path passed on the command 
 - Admin API listen URL, defaulting to `127.0.0.1` on a port documented in the sample config.
 - Data directory (database, admin token file, backups, and any generated files).
 - Matchmaking URL, in the same operator-facing sense as the existing licensed matchmaker's configured URL.
-- Tag secret for talking to that matchmaker. Prefer an environment variable or a separate file with restricted permissions over a world-readable config, and never log the value. The launcher swaps the matchmaking URL and the tag secret together when the operator picks a saved region; see [REGIONS.md](REGIONS.md).
+- Tag secret for talking to that matchmaker. Prefer an environment variable or a separate file with restricted permissions over a world-readable config, and never log the value. The launcher swaps the matchmaking URL and that server's tag secret together when the operator picks a saved matchmaking server (any operator); see [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
 - Log level and log path.
 
 Sample config in the repo uses placeholders and loopback addresses only. A real tag secret or admin token is never an example value.
@@ -77,7 +77,7 @@ Milestone M5. This server does not ship a web UI, a static site, or a browser-fa
   - Logs.
   - Backups and restores.
   - Health and status, so the launcher can tell that the process is ready.
-- The API is not a public stats service. Public community leaderboards stay on the existing global leaderboard deployment (a public page or Discord), which this server may submit to as [REGIONS.md](REGIONS.md) describes.
+- The API is not a public stats service. This operator's public community leaderboards stay on the existing global leaderboard deployment (a public page or Discord), which this server may submit to as [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md) describes. Submissions to a third-party matchmaker's board are opt-in per saved server.
 
 ### Command-line admin tool
 
@@ -107,8 +107,8 @@ This process is a card server, not a matchmaker. It should:
 - Accept the operator's matchmaking URL and tag secret from config.
 - Give cabinets whatever boot-time or settings data the behavior spec says they need in order to use that matchmaker.
 - Stay compatible with the existing licensed matchmaker, including the way that project already expects a matchmaking URL and a shared tag secret to be presented.
-- Submit leaderboard or result data as the M4 spec requires, without assuming a particular private host. Submissions carry region as metadata and keep a single per-card identity, as in [REGIONS.md](REGIONS.md).
-- Leave player stats untouched when the matchmaking URL or region changes.
+- Submit leaderboard or result data as the M4 spec requires, without assuming a particular private host. Submissions to this operator's board carry the last-matchmaker label as metadata and keep a single per-card identity, as in [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md). Third-party boards are opt-in and must never receive ChipId, AccessCode, or other secrets.
+- Leave player stats untouched when the matchmaking URL or saved server changes. A third-party matchmaker is untrusted: validate what it sends, never let it write stats directly, and rate-limit that traffic.
 
 It should not embed a second matchmaker unless a later, separate decision says otherwise.
 
@@ -137,7 +137,7 @@ The [Windows launcher](https://github.com/ServerOmega/exvs2-launcher) and the [L
 
 1. Download the artifact for the current OS.
 2. Verify the published SHA-256.
-3. Unpack or place the executable and a config file (the launcher already knows how to store a matchmaking URL and a tag secret locally, and must write those two as a pair when the operator picks a saved region).
+3. Unpack or place the executable and a config file (the launcher already knows how to store a matchmaking URL and a tag secret locally, and must write those two as a pair when the operator picks a saved matchmaking server; each server has its own secret, which is never sent to another server).
 4. Start the executable and wait until it is accepting connections.
 5. Use the local admin API (token from the data directory) for card management, leaderboard and match history views, settings, logs, and backups.
 6. Never compile, never fetch unlicensed upstream source, and never open a web UI on this server to manage it.
@@ -149,6 +149,6 @@ Until those releases exist, the launchers keep their current install path for th
 - Unit tests for config, redaction, schema migrations, and pure protocol codecs once those exist.
 - Conformance tests built from the behavior spec, using redacted fixtures, never raw captures.
 - Importer dry-run and parity tests against synthetic copies of a source database, never against a live original and never with real identifiers committed.
-- A parity matrix run on real cabinets, described in [ROADMAP.md](ROADMAP.md), including stats parity after migration and a region-switch round trip.
+- A parity matrix run on real cabinets, described in [ROADMAP.md](ROADMAP.md), including stats parity after migration and a matchmaking-server-switch round trip (own LA → own EU → a third-party test server → back to own LA).
 
 No test in this repository may require a game executable, an unlicensed source tree, or a live private server address.

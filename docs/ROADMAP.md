@@ -2,9 +2,9 @@
 
 Planning-only repository. Milestones below are the intended order of work. Each one should be testable on the operator's own cabinets before the next implementation milestone is treated as done. The current card server remains in daily use until this one can replace it for real play.
 
-Related documents: [PLAN.md](PLAN.md), [CLEAN-ROOM.md](CLEAN-ROOM.md), [ARCHITECTURE.md](ARCHITECTURE.md), [MIGRATION.md](MIGRATION.md), [REGIONS.md](REGIONS.md).
+Related documents: [PLAN.md](PLAN.md), [CLEAN-ROOM.md](CLEAN-ROOM.md), [ARCHITECTURE.md](ARCHITECTURE.md), [MIGRATION.md](MIGRATION.md), [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
 
-A 1.0 release **cannot ship** until milestone M6 has verified stats parity on real cabinets. Switching matchmaking regions must also leave player stats and global leaderboard identity intact, as [REGIONS.md](REGIONS.md) requires.
+A 1.0 release **cannot ship** until milestone M6 has verified stats parity on real cabinets. Switching any matchmaking server, including a third-party one, must also leave player stats and this operator's global leaderboard identity intact, as [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md) requires.
 
 ## Milestones
 
@@ -76,21 +76,21 @@ A 1.0 release **cannot ship** until milestone M6 has verified stats parity on re
 
 ### M4 — Matchmaking integration and leaderboards
 
-**Goal.** Cabinets using this card server can play online through the **existing** matchmaker, and result or leaderboard data the spec assigns to the card server is submitted or stored correctly. Changing region must not rewrite card data.
+**Goal.** Cabinets using this card server can play online through a configured matchmaker (this operator's or a third party's), and result or leaderboard data the spec assigns to the card server is submitted or stored correctly. Changing matchmaking server must not rewrite card data.
 
 **Work**
 
-- Config for the matchmaking URL and the shared tag secret, compatible with the existing licensed matchmaker. The launcher already stores saved servers; it must write the URL and the tag secret as a pair, because each region has its own secret.
+- Config for the matchmaking URL and the shared tag secret, compatible with the existing licensed matchmaker. The launcher already stores saved servers; it must write the URL and that server's tag secret as a pair, because each saved server (any operator) has its own secret, which is never sent to another server.
 - The handoff behavior the cabinet expects, as recorded in the spec.
-- Leaderboard or result submission as specified, again from captures and public licensed docs, re-checked on a real cab. Submissions use a single per-card identity, carry region as metadata, and are idempotent. The display-region rule and idle-switch rule are in [REGIONS.md](REGIONS.md).
-- Match history stored on this server keeps a region field.
+- Leaderboard or result submission as specified, again from captures and public licensed docs, re-checked on a real cab. Submissions to this operator's board use a single per-card identity, carry the last-matchmaker label as metadata, and are idempotent. Third-party board submission is opt-in per saved server and, if used, sends only a derived pseudonymous id, never ChipId, AccessCode, or other secrets. The idle-switch rule, trust model, and `/status` compatibility warning are in [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
+- Match history stored on this server records which matchmaking server (label or host) was in use.
 - This server does not replace the matchmaker, and it is not the public community stats site.
 
 **Acceptance, on a real cab**
 
 - A cabinet pointed at this card server can enter online play through the operator's existing matchmaker, using the configured URL and tag secret.
 - A completed test match produces the result or leaderboard behavior the spec requires.
-- A later M6/M7 region-switch round trip (for example LA to EU and back to LA) leaves card stats unchanged and does not duplicate or reset the global leaderboard entry. The formal check lives in the parity matrix and [REGIONS.md](REGIONS.md); M4 only has to make the submission keys and region metadata capable of that check.
+- A later M6/M7 matchmaking-server-switch round trip (own LA → own EU → a third-party test server → back to own LA) leaves card stats unchanged and does not duplicate or reset this operator's global leaderboard entry. The formal check lives in the parity matrix and [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md); M4 only has to make the submission keys, last-matchmaker metadata, and untrusted-matchmaker handling capable of that check.
 - Secrets used for this test are not committed and are not printed in public logs or issues.
 
 ### M5 — Admin API + CLI + launcher integration
@@ -120,7 +120,7 @@ A 1.0 release **cannot ship** until milestone M6 has verified stats parity on re
 
 - Follow [MIGRATION.md](MIGRATION.md) in full: mapping spec, copy-only importer, dry-run report, checksum and count parity, side-by-side cabinet verification, freeze window, and rollback by keeping the previous server.
 - The first import scope must preserve cards, profiles, unlocks, play counts, win/loss, class/rank, match history, and leaderboard submission state. Card identity fields (ChipId and AccessCode) are not rewritten.
-- Global leaderboard continuity: the same card identity is used for submissions after import, with idempotent resubmission, so community entries do not duplicate or reset. Region is metadata only; see [REGIONS.md](REGIONS.md).
+- Global leaderboard continuity: the same card identity is used for submissions after import, with idempotent resubmission, so this operator's community entries do not duplicate or reset. Which matchmaking server was used is metadata only; see [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
 - Handling of secrets: the source copy stays private, and the tool does not write secrets into logs or into this repo.
 
 **Acceptance**
@@ -142,14 +142,14 @@ A 1.0 release **cannot ship** until milestone M6 has verified stats parity on re
 - A SHA-256 file published with every release.
 - A sample config, a systemd unit, and a documented Windows service install.
 - Launcher changes (in their own repos) to download the artifact, verify the hash, write config, start the process, and use the admin API, instead of building any other server.
-- A documented region-switch path in the launcher that follows [REGIONS.md](REGIONS.md).
+- A documented matchmaking-server-switch path in the launcher that follows [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md), including any third-party server, an idle-only switch, a paired URL and tag secret, and a warning when `/status` reports an incompatible protocol version.
 
 **Acceptance**
 
 - A tagged release produces both required artifacts and checksums on GitHub Actions without a local manual build.
 - A clean Windows machine and a clean Linux machine can run the artifact from the release, with no SDK installed, and manage it with the CLI (and, on a machine with the launcher, through the launcher).
 - The Windows launcher and the Linux launcher can install that release, verify SHA-256, start the server, and talk to the admin API, until a cab can still complete the M1–M4 checks.
-- The M6 stats-parity checks and the region-switch round trip in the parity matrix have already passed.
+- The M6 stats-parity checks and the matchmaking-server-switch round trip in the parity matrix have already passed.
 - Operators are told they can stop building the unlicensed server *only* after those checks pass.
 
 ## Parity test matrix
@@ -167,13 +167,13 @@ Use this as the living checklist for "can this replace the current card server f
 | 7 | Online settings or events the cab reads match the configured values | M3 | | | |
 | 8 | Matchmaking URL and tag secret are accepted by the existing matchmaker | M4 | | | No private host addresses in reports |
 | 9 | Cabinet can queue and complete a test match through that matchmaker | M4 | | | |
-| 10 | Result or leaderboard submission matches the spec, with region metadata and a stable per-card identity | M4 | | | Idempotent resubmission |
+| 10 | Result or leaderboard submission matches the spec, with last-matchmaker metadata and a stable per-card identity on this operator's board | M4 | | | Idempotent resubmission; third-party boards remain opt-in |
 | 11 | Admin API and CLI: status, masked card list, backup/restore, export, settings get/set, logs | M5 | | | No web UI; token never logged |
 | 12 | Launcher can perform the same admin tasks through the local admin API | M5 | | | Windows and Linux launchers |
 | 13 | Migrated test card logs in; dry-run counts and checksums match the import | M6 | | | Private source *copy*, never committed; original DB not written |
 | 14 | Stats parity: same card, side-by-side stats screen on previous server and this server (profiles, unlocks, play counts, win/loss, class/rank, match history, leaderboard submission state) | M6 | | | Gate for 1.0; see [MIGRATION.md](MIGRATION.md) |
 | 15 | Rollback: launcher pointed back at the previous server still loads the same card from the untouched original database | M6 | | | Switching is opt-in and reversible |
-| 16 | Region switch LA to EU, then back to LA: card stats unchanged, match history keeps a region field, global leaderboard entry neither duplicated nor reset | M6 / M7 | | | Cabs idle during the switch; see [REGIONS.md](REGIONS.md) |
+| 16 | Matchmaking-server switch, own LA → own EU → a third-party test server → back to own LA: card stats unchanged, match history records each server's label or host, this operator's global leaderboard entry neither duplicated nor reset, third-party board submission stays opt-in | M6 / M7 | | | Cabs idle during each switch; incompatible `/status` version warns; previous secrets are not sent to the next server; see [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md) |
 | 17 | Launcher downloads the release, verifies SHA-256, starts the server, and uses the admin API | M7 | | | Windows and Linux launchers |
 | 18 | Clean machine, no SDK, artifact from GitHub Releases only, CLI can manage the process | M7 | | | |
 
@@ -219,7 +219,7 @@ Until M7 is accepted, launcher work in those repos should not promise a no-build
 
 ### Stats and identity
 
-- A migration that rewrites card identity, drops a stats field, or resubmits leaderboard rows under a new key would interfere with player stats. [MIGRATION.md](MIGRATION.md) and [REGIONS.md](REGIONS.md) exist to prevent that.
+- A migration that rewrites card identity, drops a stats field, or resubmits leaderboard rows under a new key would interfere with player stats. [MIGRATION.md](MIGRATION.md) and [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md) exist to prevent that.
 - Mitigation: copy-only import, dry-run counts, side-by-side cabinet checks, and a rollback path that leaves the previous server untouched. 1.0 waits on those checks.
 
 ### Effort

@@ -8,7 +8,7 @@ Companion documents:
 - [ARCHITECTURE.md](ARCHITECTURE.md) — proposed stack, packaging, admin API, and CLI
 - [ROADMAP.md](ROADMAP.md) — staged milestones, tests, and risks
 - [MIGRATION.md](MIGRATION.md) — moving player data from an existing card server without losing stats
-- [REGIONS.md](REGIONS.md) — switching matchmaking regions without touching card data
+- [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md) — switching any matchmaking server without touching card data
 
 ## Problem
 
@@ -37,7 +37,7 @@ This repo implements the **card server** role only. Matchmaking stays in [exvs2-
 
 The server is **headless**. Cabinets talk to the game-facing card protocol. Operators talk to a local admin API from the Windows or Linux launcher, or to a command-line admin tool on a headless host. There is no web interface on this process. Public community stats stay on the existing global leaderboards (a public page or Discord), not on this server.
 
-Moving to this server, or switching a cabinet between matchmaking regions, must not interfere with player stats. Those rules are in [MIGRATION.md](MIGRATION.md) and [REGIONS.md](REGIONS.md). Verified stats parity is a gate for 1.0.
+Moving to this server, or switching a cabinet between any matchmaking servers (this operator's or a third party's), must not interfere with player stats. Those rules are in [MIGRATION.md](MIGRATION.md) and [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md). Verified stats parity is a gate for 1.0.
 
 ## What this repository is
 
@@ -72,7 +72,7 @@ Until M7, this repo does not publish binaries, and the launchers should keep usi
 1. Agree the clean-room process and keep it visible to every contributor ([CLEAN-ROOM.md](CLEAN-ROOM.md)).
 2. Milestone M0: capture tooling, redaction rules, and the first behavior spec sections, written in our own words at a functional level and marked "to be verified against the real game."
 3. Implement against the spec in order: boot and network checks, card login and save, online settings, matchmaking handoff and leaderboard submission, then the admin API, CLI, and launcher integration.
-4. Build the migration tool from a written mapping spec, and prove stats parity on real cabinets ([MIGRATION.md](MIGRATION.md)). This is a **gating requirement for 1.0**: a release cannot be called 1.0 until a migrated card shows the same stats as it did on the previous server, and a region switch leaves those stats untouched ([REGIONS.md](REGIONS.md)).
+4. Build the migration tool from a written mapping spec, and prove stats parity on real cabinets ([MIGRATION.md](MIGRATION.md)). This is a **gating requirement for 1.0**: a release cannot be called 1.0 until a migrated card shows the same stats as it did on the previous server, and a matchmaking-server switch (including to a third-party matchmaker and back) leaves those stats untouched ([MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md)).
 5. Only then cut 1.0 releases and point the launchers at them.
 
 Details and acceptance tests are in [ROADMAP.md](ROADMAP.md).
@@ -97,7 +97,7 @@ These should be decided before the first implementation milestone (M1), except w
 
 8. **Migration scope (M6).** [MIGRATION.md](MIGRATION.md) requires the first import to preserve cards, profiles, unlocks, play counts, win/loss, class/rank, match history, and leaderboard submission state, with identity fields left unchanged. Whether that first tool also covers operator settings, friends, teams, and similar account data can be decided in the mapping spec, but stats-bearing player data is not optional.
 
-9. **Leaderboard display region.** [REGIONS.md](REGIONS.md) recommends showing a card under the region of its most recent accepted submission, with cumulative stats kept as a single identity. Confirm or replace that rule before M4 leaderboard work is considered done.
+9. **Last-matchmaker metadata on the operator's board.** [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md) recommends keeping one entry per card on this operator's global leaderboard, with an optional last-matchmaker label as metadata only. Third-party board submission is opt-in per saved server and, if used at all, may send only a derived pseudonymous id. Confirm or replace those rules before M4 leaderboard work is considered done.
 
 ## Immediate next step
 

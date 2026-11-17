@@ -2,7 +2,7 @@
 
 This document is the plan for moving an operator from the card server they run today to this clean-room server **without interfering with player stats**. It is also a **gating requirement for 1.0**: a release cannot be called 1.0 until the parity checks below have passed on real cabinets.
 
-Switching matchmaking regions (for example LA to EU and back) is a different operation. That path must also leave stats intact, but it does not copy a database. See [REGIONS.md](REGIONS.md).
+Switching matchmaking servers (any operator, for example this operator's LA or EU servers or a third-party matchmaker, and back) is a different operation. That path must also leave stats intact, but it does not copy a database. See [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
 
 Related documents: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md), [CLEAN-ROOM.md](CLEAN-ROOM.md).
 
@@ -11,7 +11,7 @@ Related documents: [PLAN.md](PLAN.md), [ARCHITECTURE.md](ARCHITECTURE.md), [ROAD
 1. **Player stats are preserved.** After import, a card shows the same profile, unlocks, play counts, win/loss, class/rank, and match history the previous server showed.
 2. **The importer never writes the original database.** It reads only a copy. Rollback is "keep using the previous server."
 3. **Card identity does not change.** The fields the cabinet uses to recognize a card, referred to here as ChipId and AccessCode, are copied as-is. They are not regenerated, re-encoded, or replaced. A card that logged in before must still match after the switch.
-4. **Global leaderboard identity stays the same.** Submissions after import use the same card identity and the same submission keys, so community entries do not duplicate or reset. Region is metadata. Resubmission is idempotent. Details are in [REGIONS.md](REGIONS.md).
+4. **Global leaderboard identity stays the same.** Submissions after import use the same card identity and the same submission keys, so this operator's community entries do not duplicate or reset. Which matchmaking server was used is metadata, not part of the identity. Resubmission is idempotent. Details are in [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
 5. **Switching is opt-in and reversible.** An operator chooses when to point a launcher at this server. Pointing it back at the previous server, with the original database untouched, must still work.
 6. **No upstream source.** The mapping spec treats the existing database as an observed data format, documented from a copy the operator owns. It does not copy typings, comments, schema dumps taken from unlicensed source, or file layouts from that project.
 7. **No secrets in git.** Source databases, raw dumps, real ChipId or AccessCode values, tag secrets, and admin tokens stay out of this repository and out of logs.
@@ -71,7 +71,7 @@ Counts and checksums are not enough. After a successful import of a private copy
 3. Log in the same card on the previous server.
 4. Compare the in-game stats screen and any related menus: profile, unlocks, play counts, win/loss, class/rank, and match history.
 5. Confirm the card is recognized as the same card (no re-registration prompt, no empty save).
-6. After a test match, confirm that a leaderboard submission updates the existing community entry rather than creating a second one or resetting totals. Use the identity and idempotency rules in [REGIONS.md](REGIONS.md).
+6. After a test match, confirm that a leaderboard submission updates the existing community entry on this operator's board rather than creating a second one or resetting totals. Use the identity and idempotency rules in [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
 
 Only a pass on this comparison closes the M6 stats-parity row in [ROADMAP.md](ROADMAP.md).
 
@@ -107,7 +107,7 @@ Switching to this server is therefore reversible for as long as the operator kee
 Migration must not create a second community identity for a card, and must not reset an existing entry.
 
 - Submission keys are derived from the same preserved card identity, not from a new identifier this server invents.
-- Region is metadata on a submission, not part of the identity. See [REGIONS.md](REGIONS.md).
+- Which matchmaking server was used is metadata on a submission, not part of the identity. See [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md).
 - After import, an idempotent resubmission of the card's current cumulative stats is allowed so the community board stays in sync. A resubmit with the same identity updates the existing row. It does not append a duplicate and does not zero totals.
 
 Private host addresses of those boards are never written into this repository.
@@ -119,7 +119,7 @@ The following rows in the [ROADMAP.md](ROADMAP.md) parity matrix are the officia
 - Migrated test card logs in; dry-run counts and checksums match the import.
 - Stats parity on the in-game stats screen, side by side with the previous server.
 - Rollback to the previous server still works.
-- A later region-switch round trip, described in [REGIONS.md](REGIONS.md), still shows the same stats and the same leaderboard identity.
+- A later matchmaking-server-switch round trip (own LA → own EU → a third-party test server → back to own LA), described in [MATCHMAKING-SERVERS.md](MATCHMAKING-SERVERS.md), still shows the same stats and the same identity on this operator's leaderboard.
 
 ## What stays out of this repository
 

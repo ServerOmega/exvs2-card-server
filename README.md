@@ -21,7 +21,7 @@ Licensed under the **GNU General Public License v3.0** — see [LICENSE](LICENSE
 | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | Proposed stack, packaging, config, admin API, CLI, and services |
 | [docs/ROADMAP.md](docs/ROADMAP.md) | Milestones M0–M7, parity tests, risks, and launcher downloads |
 | [docs/MIGRATION.md](docs/MIGRATION.md) | Moving player data from an existing card server without losing stats |
-| [docs/REGIONS.md](docs/REGIONS.md) | Switching matchmaking regions without touching card data or resetting leaderboards |
+| [docs/MATCHMAKING-SERVERS.md](docs/MATCHMAKING-SERVERS.md) | Switching any matchmaking server (including third-party ones) without touching card data or resetting the operator's leaderboard |
 
 People should keep using their current card server until this one can replace it. Each milestone has to pass against real cabinets before the next one starts in earnest. A 1.0 release cannot ship until migrated player stats have been verified against the previous server.
 
@@ -41,7 +41,7 @@ Join the [EXVS2 matchmaking Discord](https://discord.gg/YENXAmjkYX) for guides, 
 - Windows launcher: [ServerOmega/exvs2-launcher](https://github.com/ServerOmega/exvs2-launcher)
 - Linux launcher: [ServerOmega/exvs2-launcher-linux](https://github.com/ServerOmega/exvs2-launcher-linux)
 
-This card server is meant to work with the existing matchmaker (including the configured matchmaking URL and shared tag secret). It does not replace that matchmaker. Changing which matchmaking region a cabinet uses must not alter player stats; see [docs/REGIONS.md](docs/REGIONS.md).
+This card server is meant to work with the existing matchmaker (including the configured matchmaking URL and shared tag secret). It does not replace that matchmaker. It can point a cabinet at any matchmaking server, including ones other people run. Changing which matchmaker a cabinet uses must not alter player stats or expose card data beyond the match protocol; see [docs/MATCHMAKING-SERVERS.md](docs/MATCHMAKING-SERVERS.md).
 
 ## License
 
