@@ -42,3 +42,7 @@ captures/
 *.db-wal
 *.sqlite
 *.sqlite3
+
+# Admin API token files — live in the server data directory, never committed.
+*.token
+admin-token

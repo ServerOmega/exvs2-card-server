@@ -17,7 +17,7 @@ Spec writers observe the game and write the behavior spec.
 They may:
 
 - Capture traffic from the operator's own cabinets while the official game talks to a card server the operator already runs.
-- Watch the cabinet and the official web pages as a *user* of the running system (boot to attract mode, card login, save, menus, online settings).
+- Watch the cabinet and any operator- or player-facing screens of the running system as a *user* (boot to attract mode, card login, save, menus, online settings, account or stats screens). Observation of a current browser UI is allowed only as a user, to learn what tasks exist. The replacement for those tasks in this project is the local admin API, the CLI, and the launchers, not a new web UI, and no upstream UI source may be copied.
 - Read public documentation, including the licensed documents in [exvs2-matchmaking](https://github.com/ServerOmega/exvs2-matchmaking), [exvs2-launcher](https://github.com/ServerOmega/exvs2-launcher), and [exvs2-launcher-linux](https://github.com/ServerOmega/exvs2-launcher-linux).
 - Write functional descriptions: message categories, when the cabinet sends them, what the cabinet needs in order to proceed, and what should be stored.
 
@@ -60,7 +60,7 @@ Each section should be written as a *behavior spec to be verified by packet capt
 - Online settings and event data the cabinet reads after it is up.
 - Handoff to matchmaking (the configured matchmaking URL and the shared tag secret, compatible with the existing matchmaker).
 - Submission of results or leaderboard data, if the cabinet sends them to the card server.
-- Browser-facing account features the official game's operators and players already use, described from observation, not from another project's UI source.
+- Operator management tasks (status, card management with identifiers masked, backups, settings, logs, leaderboard and match history views) that the launchers and the CLI will perform through a local admin API. This server does not ship a web UI. Public community stats stay on the existing global leaderboards, not on this process.
 
 Exact routes, field layouts, content types, and error handling are filled in from captures. If a public document and a capture disagree, the capture of the game wins, and the spec is updated.
 
@@ -91,7 +91,7 @@ Reviewers should reject a change that looks copied from upstream, that introduce
 
 1. Read this file before you open a pull request.
 2. Do not add game files, assets, executables, teardowns of official binaries, byte offsets, or hashes of those binaries.
-3. Do not add card identifiers, access codes, boot tokens, webhook URLs, private server addresses, or raw packet captures.
+3. Do not add card identifiers, access codes, boot tokens, webhook URLs, admin API tokens, private server addresses, or raw packet captures.
 4. Do not add source, patches, or verbatim layouts from the unlicensed upstream card server.
 5. Keep secrets out of logs, sample config, and tests. Use placeholders.
 6. Prefer small pull requests that map clearly to a spec section.
@@ -162,7 +162,7 @@ A `Signed-off-by` on a commit that contains unlicensed upstream material does no
 | Unlicensed upstream source, patches with its context, decompiled binaries | No license to copy or redistribute |
 | Game executables, assets, extracted keys, byte offsets, official hashes | Not ours to publish; not needed in a protocol spec |
 | Raw packet captures | Can contain card identifiers and private addresses |
-| Chip IDs, access codes, boot tokens, tag secrets, webhook URLs | Secrets and personal player data |
+| Chip IDs, access codes, boot tokens, tag secrets, admin API tokens, webhook URLs | Secrets and personal player data |
 | Private server host addresses | Do not publish operator infrastructure |
 
 Local capture files and private spec notes should live outside this clone, or in ignored paths such as `captures/` and `spec-private/`. Those paths are listed in `.gitignore` on purpose.

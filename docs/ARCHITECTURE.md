@@ -6,17 +6,22 @@ This is a proposed architecture for the clean-room card server. It is not an imp
 
 - One codebase that publishes **self-contained, single-file** native builds for Windows and Linux.
 - Operators can run a release without installing a SDK and without compiling.
-- The Windows and Linux launchers can download a release, verify SHA-256, write a config file, and start the process.
+- The Windows and Linux launchers can download a release, verify SHA-256, write a config file, start the process, and manage it through a local admin API.
+- A command-line admin tool covers the same management tasks on a headless host.
+- There is no web interface. Public community stats stay on the existing global leaderboards, not on this process.
 - Protocol behavior comes from the clean-room spec in [CLEAN-ROOM.md](CLEAN-ROOM.md).
 - Secrets and player identifiers stay out of logs, sample config, and the git history.
+- Moving to this server, or switching matchmaking regions, must not interfere with player stats. See [MIGRATION.md](MIGRATION.md) and [REGIONS.md](REGIONS.md).
 
 ## Runtime and HTTP stack
 
 - **.NET 8 or .NET 9** (see the open question in [PLAN.md](PLAN.md)).
-- **ASP.NET Core** on **Kestrel**. One process serves the cabinet-facing HTTP API and, from milestone M5, the operator and player web UI.
-- Listen address and port come from the config file, not from compiled-in defaults that point at any private host. A typical local launcher setup already waits on a loopback port; the exact bind values will be confirmed during M0 captures and documented as examples using loopback only.
+- **ASP.NET Core** on **Kestrel**. One process serves two endpoint groups:
+  - The **game-facing card protocol**, on the listen address and port the cabinets already use.
+  - A **local admin API**, bound to `127.0.0.1` by default, used by the launchers and the CLI.
+- Listen addresses and ports come from the config file, not from compiled-in defaults that point at any private host. A typical local launcher setup already waits on a loopback port for the game-facing API; the exact bind values will be confirmed during M0 captures and documented as examples using loopback only.
 
-No other web server is required in the 1.0 process. A reverse proxy (nginx, Caddy, IIS) is optional for operators who want TLS at the edge.
+No other web server is required in the 1.0 process. A reverse proxy is optional only in front of the game-facing API if an operator wants TLS at the edge. The admin API stays on loopback and is not published through a public site.
 
 ## Packaging
 
@@ -28,7 +33,7 @@ Releases use `dotnet publish` with self-contained, single-file output:
 | `linux-x64` | Required |
 | `linux-arm64` | Optional, if it does not delay 1.0 |
 
-Each artifact should be a single executable (plus a sample config and a short run guide in the release notes), accompanied by a SHA-256 sum for every file. Trimmed or AOT builds are a later optimization only if they do not break the protocol or the web UI. The first releases should prefer a reliable self-contained build over the smallest possible binary.
+Each artifact should be a single executable (plus a sample config, the admin CLI if it is a separate binary, and a short run guide in the release notes), accompanied by a SHA-256 sum for every file. Trimmed or AOT builds are a later optimization only if they do not break the protocol, the admin API, or the CLI. The first releases should prefer a reliable self-contained build over the smallest possible binary.
 
 The repository will eventually hold GitHub Actions that build those two required runtimes on every release tag, upload the artifacts, and publish the checksums. Until milestone M7, no binaries are published.
 
@@ -37,6 +42,8 @@ The repository will eventually hold GitHub Actions that build those two required
 - **SQLite** as the default database, stored in a configured data directory.
 - Access via **EF Core or Dapper** (decided at M2). Schema migrations are versioned in this repository and applied on startup, or by an explicit command, so an older data directory can move forward safely.
 - The schema is designed here, from the behavior spec. It is not imported from any other server's source.
+- Card identity fields the cabinet uses to recognize a card (referred to here as ChipId and AccessCode) are stored so that a migrated or region-switched card keeps the same identity. Those values are secrets: they are never logged, never used as example data, and never committed.
+- Match history rows keep a region field, as described in [REGIONS.md](REGIONS.md). Player stats themselves are not partitioned by region.
 
 Do not commit live database files. Tests use throwaway files or in-memory equivalents, with fake identifiers only.
 
@@ -44,24 +51,45 @@ Do not commit live database files. Tests use throwaway files or in-memory equiva
 
 A single config file next to the executable, or at a path passed on the command line, should cover:
 
-- Listen URL (host and port).
-- Data directory (database and any uploaded or generated files).
+- Game-facing listen URL (host and port).
+- Admin API listen URL, defaulting to `127.0.0.1` on a port documented in the sample config.
+- Data directory (database, admin token file, backups, and any generated files).
 - Matchmaking URL, in the same operator-facing sense as the existing licensed matchmaker's configured URL.
-- Tag secret for talking to that matchmaker. Prefer an environment variable or a separate file with restricted permissions over a world-readable config, and never log the value.
+- Tag secret for talking to that matchmaker. Prefer an environment variable or a separate file with restricted permissions over a world-readable config, and never log the value. The launcher swaps the matchmaking URL and the tag secret together when the operator picks a saved region; see [REGIONS.md](REGIONS.md).
 - Log level and log path.
-- Later: web UI bind and authentication settings.
 
-Sample config in the repo uses placeholders and loopback addresses only. A real tag secret is never an example value.
+Sample config in the repo uses placeholders and loopback addresses only. A real tag secret or admin token is never an example value.
 
-The process should refuse to start if required values are missing, and should redact secrets and card identifiers in every log line.
+The process should refuse to start if required values are missing, if the admin API would bind off loopback without an explicit later decision allowing that, or if the admin token file is missing or empty. It should redact secrets, admin tokens, and card identifiers in every log line.
 
-## Web UI
+## Admin API and CLI
 
-Milestone M5. Served by the same process (static files, a small hosted UI, or similar). It should cover the account and operator tasks that the behavior spec records from real use, such as inspecting a card and managing friends or teams, once those are specified.
+Milestone M5. This server does not ship a web UI, a static site, or a browser-facing account app.
 
-The UI stack is an open question. It must be chosen independently, not by reproducing another project's pages, component tree, or client framework.
+### Admin API
 
-Until M5, a healthy process and a simple status page or health endpoint are enough for the launchers to know the server is up.
+- Local HTTP API bound to `127.0.0.1` by default.
+- Token-authenticated. The process creates or reads a token file in the server data directory, with permissions restricted to the service user. The token is never written to logs, sample config, or this repository.
+- Used by the [Windows launcher](https://github.com/ServerOmega/exvs2-launcher) and the [Linux launcher](https://github.com/ServerOmega/exvs2-launcher-linux) for:
+  - Card management (lists and exports mask identifiers by default).
+  - Leaderboard and match history views for cards this operator hosts.
+  - Settings get and set.
+  - Logs.
+  - Backups and restores.
+  - Health and status, so the launcher can tell that the process is ready.
+- The API is not a public stats service. Public community leaderboards stay on the existing global leaderboard deployment (a public page or Discord), which this server may submit to as [REGIONS.md](REGIONS.md) describes.
+
+### Command-line admin tool
+
+A fallback for headless or Linux-only installs, and for operators who manage the server over SSH:
+
+- Either `exvs2-card-server admin ...` or a separate `exvs2-cardctl` (see the open question in [PLAN.md](PLAN.md)).
+- Talks to the same local admin API, using the token file, so launcher and CLI cannot drift apart.
+- Commands at minimum: status, cards list (masked), backup, restore, export, settings get, settings set, logs.
+
+Remote administration in 1.0 is "SSH to the host and run the CLI," not "expose the admin API on a public address."
+
+Until M5, a health or ready check on loopback is enough for the launchers to know the server is up.
 
 ## Process model and OS integration
 
@@ -79,13 +107,14 @@ This process is a card server, not a matchmaker. It should:
 - Accept the operator's matchmaking URL and tag secret from config.
 - Give cabinets whatever boot-time or settings data the behavior spec says they need in order to use that matchmaker.
 - Stay compatible with the existing licensed matchmaker, including the way that project already expects a matchmaking URL and a shared tag secret to be presented.
-- Submit leaderboard or result data as the M4 spec requires, without assuming a particular private host.
+- Submit leaderboard or result data as the M4 spec requires, without assuming a particular private host. Submissions carry region as metadata and keep a single per-card identity, as in [REGIONS.md](REGIONS.md).
+- Leave player stats untouched when the matchmaking URL or region changes.
 
 It should not embed a second matchmaker unless a later, separate decision says otherwise.
 
-## Migration from an existing card server database (M6)
+## Migration from an existing card server database
 
-This is an **explicit later milestone**, not something the first boot or card-login builds try to do.
+Preserving player stats when an operator moves to this server is a **gating requirement for 1.0**. The procedure, mapping spec rules, dry-run reports, parity checks, freeze window, and rollback path are in [MIGRATION.md](MIGRATION.md).
 
 Before any importer is written:
 
@@ -93,12 +122,12 @@ Before any importer is written:
 2. Treat the existing database as an observed data format, documented from a local copy the operator owns, not as an excuse to import upstream source, typings, or comments.
 3. Review that mapping spec under the clean-room rules. Only then write the tool.
 
-The tool must run offline, against a copy of the source database, leave the source file untouched, and refuse to commit or upload that file. Identifiers that are secrets must be handled as secrets. A cab logging in to a migrated card, on a test copy, is the acceptance test. Details are in [ROADMAP.md](ROADMAP.md).
+The tool must run offline, against a copy of the source database, leave the source file untouched, and refuse to commit or upload that file. Switching to this server is opt-in per operator and reversible by pointing the launcher back at the previous server.
 
 ## Logging, health, and operations
 
-- Structured or plain-text logs with a consistent redaction policy (card identifiers, access codes, boot tokens, tag secrets, and similar values).
-- A health or ready check the launchers can use in addition to a raw TCP connect, once it is useful.
+- Structured or plain-text logs with a consistent redaction policy (card identifiers, access codes, boot tokens, tag secrets, admin API tokens, and similar values).
+- A health or ready check the launchers can use in addition to a raw TCP connect, once it is useful, on the admin API or a dedicated loopback endpoint.
 - Graceful shutdown so in-flight saves are not cut off mid-write.
 - No automatic phone-home. Updates are pulled by the launchers or by the operator when they choose a release.
 
@@ -108,9 +137,10 @@ The [Windows launcher](https://github.com/ServerOmega/exvs2-launcher) and the [L
 
 1. Download the artifact for the current OS.
 2. Verify the published SHA-256.
-3. Unpack or place the executable and a config file (the launcher already knows how to store a matchmaking URL and a tag secret locally).
+3. Unpack or place the executable and a config file (the launcher already knows how to store a matchmaking URL and a tag secret locally, and must write those two as a pair when the operator picks a saved region).
 4. Start the executable and wait until it is accepting connections.
-5. Never compile, and never fetch unlicensed upstream source.
+5. Use the local admin API (token from the data directory) for card management, leaderboard and match history views, settings, logs, and backups.
+6. Never compile, never fetch unlicensed upstream source, and never open a web UI on this server to manage it.
 
 Until those releases exist, the launchers keep their current install path for the existing server.
 
@@ -118,6 +148,7 @@ Until those releases exist, the launchers keep their current install path for th
 
 - Unit tests for config, redaction, schema migrations, and pure protocol codecs once those exist.
 - Conformance tests built from the behavior spec, using redacted fixtures, never raw captures.
-- A parity matrix run on real cabinets, described in [ROADMAP.md](ROADMAP.md).
+- Importer dry-run and parity tests against synthetic copies of a source database, never against a live original and never with real identifiers committed.
+- A parity matrix run on real cabinets, described in [ROADMAP.md](ROADMAP.md), including stats parity after migration and a region-switch round trip.
 
 No test in this repository may require a game executable, an unlicensed source tree, or a live private server address.

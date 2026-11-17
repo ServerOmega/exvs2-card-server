@@ -5,8 +5,10 @@ This is the project plan for a clean-room EXVS2 Infinite Boost card server that 
 Companion documents:
 
 - [CLEAN-ROOM.md](CLEAN-ROOM.md) — who may write specs, who may write code, and what must never enter the repo
-- [ARCHITECTURE.md](ARCHITECTURE.md) — proposed stack and packaging
+- [ARCHITECTURE.md](ARCHITECTURE.md) — proposed stack, packaging, admin API, and CLI
 - [ROADMAP.md](ROADMAP.md) — staged milestones, tests, and risks
+- [MIGRATION.md](MIGRATION.md) — moving player data from an existing card server without losing stats
+- [REGIONS.md](REGIONS.md) — switching matchmaking regions without touching card data
 
 ## Problem
 
@@ -33,17 +35,22 @@ The work is staged so each milestone is testable on real cabinets. The current s
 
 This repo implements the **card server** role only. Matchmaking stays in [exvs2-matchmaking](https://github.com/ServerOmega/exvs2-matchmaking). This server must be able to hand a cabinet the configured matchmaking URL and work with the existing shared tag secret, so operators can keep the matchmaker they already run.
 
+The server is **headless**. Cabinets talk to the game-facing card protocol. Operators talk to a local admin API from the Windows or Linux launcher, or to a command-line admin tool on a headless host. There is no web interface on this process. Public community stats stay on the existing global leaderboards (a public page or Discord), not on this server.
+
+Moving to this server, or switching a cabinet between matchmaking regions, must not interfere with player stats. Those rules are in [MIGRATION.md](MIGRATION.md) and [REGIONS.md](REGIONS.md). Verified stats parity is a gate for 1.0.
+
 ## What this repository is
 
 - A licensed, from-scratch card server (code comes later).
 - Planning and process documents (this commit).
-- Later: self-contained Windows and Linux builds, a config file, a database, optional service wrappers, a web UI, and a migration tool.
+- Later: self-contained Windows and Linux builds, a config file, a database, optional service wrappers, a local admin API, a command-line admin tool, and a migration tool that preserves player stats.
 
 ## What this repository is not
 
 - A fork, copy, or relabel of the unlicensed upstream card server.
 - A place for game files, assets, executables, byte offsets, or hashes of official binaries.
-- A place for packet captures, card identifiers, access codes, boot tokens, webhook URLs, or host addresses of private servers.
+- A place for packet captures, card identifiers, access codes, boot tokens, webhook URLs, admin API tokens, or host addresses of private servers.
+- A web application or a public stats site.
 - A replacement for the matchmaker, the launchers, or the game.
 
 ## Delivery model
@@ -52,10 +59,11 @@ From milestone M7, a release is a set of self-contained single-file builds plus 
 
 1. Download the build for their OS.
 2. Verify the published SHA-256.
-3. Provide a config file (listen address, data directory, matchmaking URL, tag secret).
+3. Provide a config file (game-facing listen address, admin listen address, data directory, matchmaking URL, tag secret).
 4. Start the process, or install the systemd unit / Windows service.
+5. Manage it from the launcher, or with the command-line admin tool on a headless host.
 
-There is no compile step and no requirement to own a copy of any other card server's source.
+There is no compile step, no web UI to host, and no requirement to own a copy of any other card server's source.
 
 Until M7, this repo does not publish binaries, and the launchers should keep using the current "download and build" path for the existing server.
 
@@ -63,8 +71,9 @@ Until M7, this repo does not publish binaries, and the launchers should keep usi
 
 1. Agree the clean-room process and keep it visible to every contributor ([CLEAN-ROOM.md](CLEAN-ROOM.md)).
 2. Milestone M0: capture tooling, redaction rules, and the first behavior spec sections, written in our own words at a functional level and marked "to be verified against the real game."
-3. Implement against the spec in order: boot and network checks, card login and save, online settings, matchmaking handoff and leaderboard submission, web pages, then a migration tool with its own written mapping spec.
-4. Only then cut 1.0 releases and point the launchers at them.
+3. Implement against the spec in order: boot and network checks, card login and save, online settings, matchmaking handoff and leaderboard submission, then the admin API, CLI, and launcher integration.
+4. Build the migration tool from a written mapping spec, and prove stats parity on real cabinets ([MIGRATION.md](MIGRATION.md)). This is a **gating requirement for 1.0**: a release cannot be called 1.0 until a migrated card shows the same stats as it did on the previous server, and a region switch leaves those stats untouched ([REGIONS.md](REGIONS.md)).
+5. Only then cut 1.0 releases and point the launchers at them.
 
 Details and acceptance tests are in [ROADMAP.md](ROADMAP.md).
 
@@ -78,15 +87,17 @@ These should be decided before the first implementation milestone (M1), except w
 
 3. **EF Core vs Dapper** for SQLite access. EF Core is faster to evolve while the schema is moving. Dapper is thinner if we want every query explicit. A choice can wait until M2, when we first persist card data.
 
-4. **Web UI technology.** The UI is milestone M5. The choice should be made on its own merits (simple static pages, a small SPA, or a .NET UI), not by copying the look, structure, or stack of any existing unlicensed web UI.
+4. **CLI shape.** The admin tool can be a subcommand (`exvs2-card-server admin ...`), a separate `exvs2-cardctl` binary, or both (the subcommand as the default, with a thin alias if it helps packaging). Decide before M5.
 
-5. **How operators authenticate to the web UI**, and whether a local-only install can stay open on loopback with no login.
+5. **Admin API bind beyond loopback.** The default is `127.0.0.1` only, with a token file in the data directory. For 1.0, remote operators should SSH to the host and use the CLI (or run the launcher on that same machine). Binding the admin API to a non-loopback address is out of scope unless a later decision adds TLS and a tighter access model.
 
 6. **linux-arm64.** Optional in the architecture. Decide whether 1.0 includes it or only `win-x64` and `linux-x64`.
 
 7. **STUN and related network helpers.** The matchmaker already covers a large part of online play. This server should not grow those features unless captures show the cabinet expects something from the card server itself.
 
-8. **Migration scope (M6).** Whether the first import tool covers only player save data, or also operator settings, friends, teams, and similar account data. A written mapping spec is required before any importer is written, either way.
+8. **Migration scope (M6).** [MIGRATION.md](MIGRATION.md) requires the first import to preserve cards, profiles, unlocks, play counts, win/loss, class/rank, match history, and leaderboard submission state, with identity fields left unchanged. Whether that first tool also covers operator settings, friends, teams, and similar account data can be decided in the mapping spec, but stats-bearing player data is not optional.
+
+9. **Leaderboard display region.** [REGIONS.md](REGIONS.md) recommends showing a card under the region of its most recent accepted submission, with cumulative stats kept as a single identity. Confirm or replace that rule before M4 leaderboard work is considered done.
 
 ## Immediate next step
 
