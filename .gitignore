@@ -1,0 +1,44 @@
+# Build output
+bin/
+obj/
+/artifacts/
+/publish/
+*.exe
+*.dll
+*.so
+*.pdb
+
+# IDE / OS
+.vs/
+.idea/
+*.user
+*.suo
+*.swp
+.DS_Store
+Thumbs.db
+
+# User secrets, keys, local config
+*.pem
+*.key
+*.pfx
+*.p12
+appsettings.*.local.json
+*.env
+.env
+.env.*
+
+# Packet captures and raw traces — these can contain card identifiers
+# and must never be committed. See docs/CLEAN-ROOM.md.
+*.pcap
+*.pcapng
+*.cap
+*.etl
+captures/
+/spec-private/
+
+# Databases and local data
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
